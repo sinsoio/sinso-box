@@ -1,4 +1,5 @@
 import json
+
 class ResponseModel(object):
     def __init__(self, data='', message='success', code=200):
         self.data = data
