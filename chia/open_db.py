@@ -1,7 +1,5 @@
 import sqlite3
 import os
-
-
 class SqlitDB(object):
 
     def __init__(self):

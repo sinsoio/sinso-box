@@ -4,8 +4,6 @@ from response_model import ResponseModel
 from open_db import SqlitDB
 
 app = Flask(__name__)
-
-
 # 创建
 @app.route('/insurance/createUser', methods=['POST'])
 def create_user():
