@@ -1,0 +1,44 @@
+(mod (
+		GINSENG_AMOUNT
+		MAX_CLAIMS_AMOUNT
+		pay_puzzle_hash
+		my_puzzle_hash
+		total_amount
+		claims_amount
+		claims
+     )
+  (defconstant CREATE_COIN 51)
+
+  ;join the pool,and pay the insurance fee
+	(defun-inline save_change (my_pyzzle_hash save_amount)
+	 (list
+	   (list CREATE_COIN  my_puzzle_hash save_amount)
+		 (list ASSERT_MY_PUZZLEHASH my_puzzlehash)
+	 )
+   )
+
+	 ;send coin to the pay hash,inclue claims,claims can not more than CLAIMS_AMOUNT
+	 (defun-inline send_to_pay_hash (pay_puzzle_hash amount)
+	 		(if (> amount 0)
+			 	(list
+				 	(list CREATE_COIN  pay_puzzle_hash amount)
+			 	)
+			 	(x)
+	 )
+	 )
+
+	 ;claims: false ,save .claims true,extract coin from the pool
+	 (if (claims)
+	 			(if (> total_amount claims_amount)
+						(if (> MAX_CLAIMS_AMOUNT claims_amount)
+							(list
+							(send_to_pay_hash pay_puzzle_hash claims_amount)
+							(save_change my_puzzle_hash (- total_amount claims_amount))
+							)
+							(x)
+							)
+						(x)
+				 	)
+					(save_change my_puzzle_hash total_amount)
+	 )
+)

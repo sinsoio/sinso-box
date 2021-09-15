@@ -1,0 +1,36 @@
+(mod (
+	  		TARGET_AMOUNT
+		  	INSURANCE_POOL_PUZZLE_HASH
+      	OWNER_PUZZLE_HASH
+	  		my_puzzle_hash
+	  		total_amount
+	  		join_insurance_pool
+     )
+
+  	(defconstant CREATE_COIN 51)
+
+ 		(defun-inline save (my_puzzle_hash save_amount)
+			(list
+		  	(list CREATE_COIN  my_puzzle_hash save_amount)
+		  	(list ASSERT_MY_PUZZLEHASH my_puzzlehash)
+				)
+		)
+
+		(defun join_insurance_pool (INSURANCE_POOL_PUZZLE_HASH OWNER_PUZZLE_HASH TARGET_AMOUNT amount)
+			(list
+				(list CREATE_COIN INSURANCE_POOL_PUZZLE_HASH TARGET_AMOUNT)
+				(list CREATE_COIN OWNER_PUZZLE_HASH (- amount TARGET_AMOUNT))
+			)
+		)
+
+ 		(if (> total_amount 1)
+    	(if (join_insurance_pool)
+  				(if (> total_amount TARGET_AMOUNT)
+							(join_insurance_pool INSURANCE_POOL_PUZZLE_HASH OWNER_PUZZLE_HASH TARGET_AMOUNT total_amount)
+              (save my_puzzle_hash total_amount)
+          )
+          (save my_puzzle_hash total_amount)
+           )
+      (x)
+    )
+)
