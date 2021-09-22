@@ -1,5 +1,6 @@
 from flask import Flask, request
 import os
+import json
 from response_model import ResponseModel
 from open_db import SqlitDB
 
@@ -14,16 +15,20 @@ def create_user():
     mobile = request.form.get('mobile', default='')
     area_code = request.form.get('area_code', default='')
     email = request.form.get('email', default='')
+
     amount = request.form.get('amount')
     pool_address = request.form.get('poolAddress')
     cmd = 'cdv decode %s' % pool_address
     pool_hash = os.popen(cmd).read().strip()
     owner_hash = request.form.get('owner_hash')
-    clsp_path = os.path.join(os.path.dirname(__file__), 'my_pool.clsp')
+    clsp_path = os.path.join(os.path.dirname(__file__), 'personal_pool.clsp')
+
     cmd = 'cdv clsp curry %s -a %s -a 0x%s -a 0x%s --treehash' % (clsp_path, amount, pool_hash, owner_hash)
-    hash = os.popen(cmd).read().strip()[2:0]
+    hash = os.popen(cmd).read().strip()
     cmd = 'cdv encode %s --prefix txch' % hash
+    print(cmd)
     address = os.popen(cmd).read().strip()
+    print(address)
     with SqlitDB() as cur:
         cur.execute("INSERT INTO user (user_name,country,certify_id,mobile,area_code,email,hash,pool_hash) VALUES('%s','%s','%s','%s','%s','%s','%s','%s')"
                     % (user_name, country, certify_id, mobile, area_code, email, hash, pool_hash))
@@ -39,7 +44,7 @@ def get_coins():
     cmd = 'cdv rpc coinrecords --by puzhash %s -s 584873' % hash
     res = os.popen(cmd).read().strip()
     print(type(res))
-    return ResponseModel(data=res).to_json()
+    return ResponseModel(data=json.loads(res)).to_json()
 
 
 # 加入医保池
@@ -63,10 +68,11 @@ def join_insurance_pool():
 @app.route('/insurance/createInsurancePool', methods=['POST'])
 def create_insurance_pool():
     amount = request.form.get('amount')
-    clsp_path = os.path.join(os.path.dirname(__file__), 'my_pool.clsp')
+    clsp_path = os.path.join(os.path.dirname(__file__), 'insurance_pool.clsp')
     cmd = 'cdv clsp curry %s -a %s -a 2000 --treehash' % (clsp_path, amount)
     hash = os.popen(cmd).read().strip()
     cmd = 'cdv encode %s  --prefix txch' % hash
+
     address = os.popen(cmd).read().strip()
     with SqlitDB() as cur:
         cur.execute("INSERT INTO pool (name,amount,address,hash) VALUES('%s','%s','%s','%s')"
