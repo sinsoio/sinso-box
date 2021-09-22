@@ -29,6 +29,7 @@ def create_user():
     if not hash:
         return ResponseModel(message='Curry failed', code=201).to_json()
     cmd = 'cdv encode %s --prefix txch' % hash
+    print(cmd)
     address = os.popen(cmd).read().strip()
     if not address:
         return ResponseModel(message='Get address failed', code=201).to_json()
@@ -51,7 +52,7 @@ def get_coins():
     if not res:
         return ResponseModel(message='Get coin info failed', code=201).to_json()
     print(type(res))
-    return ResponseModel(data=res).to_json()
+    return ResponseModel(data=json.loads(res)).to_json()
 
 
 # 加入医保池
@@ -79,12 +80,13 @@ def join_insurance_pool():
 @app.route('/insurance/createInsurancePool', methods=['POST'])
 def create_insurance_pool():
     amount = request.form.get('amount')
-    clsp_path = os.path.join(os.path.dirname(__file__), 'personal_pool.clsp')
+    clsp_path = os.path.join(os.path.dirname(__file__), 'insurance_pool.clsp')
     cmd = 'cdv clsp curry %s -a %s -a 2000 --treehash' % (clsp_path, amount)
     hash = os.popen(cmd).read().strip()
     if not hash:
         return ResponseModel(message='Curry failed', code=201).to_json()
     cmd = 'cdv encode %s  --prefix txch' % hash
+
     address = os.popen(cmd).read().strip()
     if not address:
         return ResponseModel(message='Encode hash failed', code=201).to_json()
