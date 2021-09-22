@@ -28,10 +28,10 @@ function createWindow() {
     height: 600,
     useContentSize: true,
     width: 1024,
-    // // 窗口是否可调整大小
-    // resizable: false,
-    // // 窗口是否可以进入全屏模式
-    // fullscreenable: false,
+    // 窗口是否可调整大小
+    resizable: false,
+    // 窗口是否可以进入全屏模式
+    fullscreenable: false,
   })
   mainWindow.loadURL(winURL)
 
