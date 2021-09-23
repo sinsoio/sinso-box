@@ -17,7 +17,10 @@ def create_user():
     mobile = request.form.get('mobile', default='')
     with SqlitDB() as cur:
         cur.execute("SELECT hash FROM user WHERE mobile='%s'" % mobile)
-        data = cur.fetchall()[0]
+        print('cur.fetchall()',cur.fetchall())
+        data = cur.fetchall()
+        if len(data) >0:
+            data=data[0]
         if len(data) > 0:
             hash = data[0]
             cmd = 'cdv encode %s --prefix txch' % hash
@@ -29,6 +32,7 @@ def create_user():
     pool_address = request.form.get('poolAddress')
     cmd = 'cdv decode %s' % pool_address
     pool_hash = os.popen(cmd).read().strip()
+    print('pool_hash',pool_hash)
     if not pool_hash:
         return ResponseModel(message='Get pool hash failed', code=201).to_json()
     owner_hash = request.form.get('owner_hash')
@@ -41,14 +45,11 @@ def create_user():
     cmd = 'cdv encode %s --prefix txch' % hash
     print(cmd)
     address = os.popen(cmd).read().strip()
-<<<<<<< HEAD
-    print(address)
-    cmd_puzzle = 'cdv clsp curry %s -a %s -a 0x%s -a 0x%s -x' % (clsp_path, amount, pool_hash, owner_hash)
-    puzzle_reveal = os.popen(cmd_puzzle).read().strip()
-=======
+    print('address:',address)
+    cmd = 'cdv clsp curry %s -a %s -a 0x%s -a 0x%s -x' % (clsp_path, amount, pool_hash, owner_hash)
+    puzzle_reveal = os.popen(cmd).read().strip()
     if not address:
         return ResponseModel(message='Get address failed', code=201).to_json()
->>>>>>> 0bc94beaafd9a74b1110c3e3b2c2a27297f62a6a
     with SqlitDB() as cur:
         cur.execute("INSERT INTO user (user_name,country,certify_id,mobile,area_code,email,hash,pool_hash,wallet_addr,puzzle_reveal) VALUES('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')"
                     % (user_name, country, certify_id, mobile, area_code, email, hash, pool_hash, wallet_addr, puzzle_reveal))
@@ -65,19 +66,12 @@ def get_coins():
         return ResponseModel(message='Decode address failed', code=201).to_json()
     cmd = 'cdv rpc coinrecords --by puzhash %s -s 584873' % hash
     res = os.popen(cmd).read().strip()
-<<<<<<< HEAD
     res = json.loads(res)
     sum = 0
     for i in res:
         if not i['spent']:
             sum += i['coin']['amount']
     return ResponseModel(data=str(sum)).to_json()
-=======
-    if not res:
-        return ResponseModel(message='Get coin info failed', code=201).to_json()
-    print(type(res))
-    return ResponseModel(data=json.loads(res)).to_json()
->>>>>>> 0bc94beaafd9a74b1110c3e3b2c2a27297f62a6a
 
 
 # 加入医保池
@@ -94,7 +88,6 @@ def join_insurance_pool():
             puzzle_reveal = data[0][0]
     cmd = 'cdv rpc coinrecords --by puzhash %s -s 584873' % hash
     res = os.popen(cmd).read().strip()
-<<<<<<< HEAD
     res = json.loads(res)
     sum = 0
     coin_spends = []
@@ -104,7 +97,7 @@ def join_insurance_pool():
             parent_coin_info=res[i]['coin']['parent_coin_info'][2:]
             puzzle_hash=res[i]['coin']['puzzle_hash'][2:]
             amount=res[i]['coin']['amount']
-            cmd = 'opc "(%s %d %d)"' % (hash, (sum-1000) if i == len(res)-1 else 0, 1 if i == len(res)-1 else 0)
+            cmd = 'opc "(0x%s %d %d)"' % (hash, (sum-1000) if i == len(res)-1 else 0, 1 if i == len(res)-1 else 0)
             print('solution' , cmd)
             solution = os.popen(cmd).read().strip()
             coin_info =  {"coin": {"parent_coin_info":parent_coin_info, "puzzle_hash": puzzle_hash, "amount": amount}, "puzzle_reveal": puzzle_reveal, "solution": solution}
@@ -114,13 +107,7 @@ def join_insurance_pool():
     with open(path, 'w') as f:
         f.write(json.dumps(join_insurance_pool_data))
     cmd = "cdv rpc pushtx %s " % path
-    print(cmd)
-=======
-    if not res:
-        return ResponseModel(message='Join pool failed', code=201).to_json()
-    join_insurance_pool_data = ""
-    cmd = "cdv inspect spendbundles %s -db" % join_insurance_pool
->>>>>>> 0bc94beaafd9a74b1110c3e3b2c2a27297f62a6a
+    print('pushtx----------:',cmd)
     res = os.popen(cmd).read().strip()
     if not res:
         return ResponseModel(message='Join pool failed', code=201).to_json()
