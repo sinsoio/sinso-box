@@ -8,6 +8,7 @@
      )
 
   	(defconstant CREATE_COIN 51)
+		(defconstant ASSERT_MY_PUZZLEHASH 72)
 
  		(defun-inline save (my_puzzle_hash save_amount)
 			(list
@@ -23,7 +24,7 @@
 			)
 		)
 
- 		(if (> total_amount 1)
+ 		(if (> total_amount 0)
     	(if (join_insurance_pool)
   				(if (> total_amount TARGET_AMOUNT)
 							(join_insurance_pool INSURANCE_POOL_PUZZLE_HASH OWNER_PUZZLE_HASH TARGET_AMOUNT total_amount)
@@ -31,6 +32,6 @@
           )
           (save my_puzzle_hash total_amount)
            )
-      (x)
+      ( )
     )
 )

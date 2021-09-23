@@ -7,12 +7,21 @@ from open_db import SqlitDB
 app = Flask(__name__)
 
 # 创建
+# 返回个人医保地址
 @app.route('/insurance/createUser', methods=['POST'])
 def create_user():
     user_name = request.form.get('userName', default='')
     country = request.form.get('country', default='')
     certify_id = request.form.get('certify_id', default='')
     mobile = request.form.get('mobile', default='')
+    with SqlitDB() as cur:
+        cur.execute("SELECT hash FROM user WHERE mobile='%s'" % mobile)
+        data = cur.fetchall()[0]
+        if len(data) > 0:
+            hash = data[0]
+            cmd = 'cdv encode %s --prefix txch' % hash
+            address = os.popen(cmd).read().strip()
+            return ResponseModel(data=address).to_json()
     area_code = request.form.get('area_code', default='')
     email = request.form.get('email', default='')
 
@@ -21,6 +30,7 @@ def create_user():
     cmd = 'cdv decode %s' % pool_address
     pool_hash = os.popen(cmd).read().strip()
     owner_hash = request.form.get('owner_hash')
+    wallet_addr = request.form.get('wallet_addr')
     clsp_path = os.path.join(os.path.dirname(__file__), 'personal_pool.clsp')
 
     cmd = 'cdv clsp curry %s -a %s -a 0x%s -a 0x%s --treehash' % (clsp_path, amount, pool_hash, owner_hash)
@@ -29,9 +39,11 @@ def create_user():
     print(cmd)
     address = os.popen(cmd).read().strip()
     print(address)
+    cmd_puzzle = 'cdv clsp curry %s -a %s -a 0x%s -a 0x%s -x' % (clsp_path, amount, pool_hash, owner_hash)
+    puzzle_reveal = os.popen(cmd_puzzle).read().strip()
     with SqlitDB() as cur:
-        cur.execute("INSERT INTO user (user_name,country,certify_id,mobile,area_code,email,hash,pool_hash) VALUES('%s','%s','%s','%s','%s','%s','%s','%s')"
-                    % (user_name, country, certify_id, mobile, area_code, email, hash, pool_hash))
+        cur.execute("INSERT INTO user (user_name,country,certify_id,mobile,area_code,email,hash,pool_hash,wallet_addr,puzzle_reveal) VALUES('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')"
+                    % (user_name, country, certify_id, mobile, area_code, email, hash, pool_hash, wallet_addr, puzzle_reveal))
     return ResponseModel(data=address).to_json()
 
 
@@ -43,23 +55,48 @@ def get_coins():
     hash = os.popen(cmd).read().strip()
     cmd = 'cdv rpc coinrecords --by puzhash %s -s 584873' % hash
     res = os.popen(cmd).read().strip()
-    print(type(res))
-    return ResponseModel(data=json.loads(res)).to_json()
+    res = json.loads(res)
+    sum = 0
+    for i in res:
+        if not i['spent']:
+            sum += i['coin']['amount']
+    return ResponseModel(data=str(sum)).to_json()
 
 
 # 加入医保池
 @app.route('/insurance/joinInsurancePool', methods=['POST'])
 def join_insurance_pool():
-    address = request.args.get('address')
+    address = request.form.get('address')
+    cmd = 'cdv decode %s' % address
+    hash = os.popen(cmd).read().strip()
+    puzzle_reveal = ''
     with SqlitDB() as cur:
-        cur.execute("SELECT hash FROM user WHERE address='%s'" % address)
+        cur.execute("SELECT puzzle_reveal FROM user WHERE hash='%s'" % hash)
         data = cur.fetchall()
-        if len(data) == 1:
-            hash = data[0][0]
+        if len(data[0]) > 0:
+            puzzle_reveal = data[0][0]
     cmd = 'cdv rpc coinrecords --by puzhash %s -s 584873' % hash
     res = os.popen(cmd).read().strip()
-    join_insurance_pool_data = ""
-    cmd = "cdv inspect spendbundles %s -db" % join_insurance_pool
+    res = json.loads(res)
+    sum = 0
+    coin_spends = []
+    for i in range(0, len(res)):
+        if not res[i]['spent']:
+            sum += res[i]['coin']['amount']
+            parent_coin_info=res[i]['coin']['parent_coin_info'][2:]
+            puzzle_hash=res[i]['coin']['puzzle_hash'][2:]
+            amount=res[i]['coin']['amount']
+            cmd = 'opc "(%s %d %d)"' % (hash, (sum-1000) if i == len(res)-1 else 0, 1 if i == len(res)-1 else 0)
+            print('solution' , cmd)
+            solution = os.popen(cmd).read().strip()
+            coin_info =  {"coin": {"parent_coin_info":parent_coin_info, "puzzle_hash": puzzle_hash, "amount": amount}, "puzzle_reveal": puzzle_reveal, "solution": solution}
+            coin_spends.append(coin_info)
+    join_insurance_pool_data = {"coin_spends":coin_spends,  "aggregated_signature": "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}
+    path = os.path.join(os.path.dirname(__file__), 'tmp.json')
+    with open(path, 'w') as f:
+        f.write(json.dumps(join_insurance_pool_data))
+    cmd = "cdv rpc pushtx %s " % path
+    print(cmd)
     res = os.popen(cmd).read().strip()
     return ResponseModel(data=res).to_json()
 
@@ -67,16 +104,18 @@ def join_insurance_pool():
 # 创建医保池
 @app.route('/insurance/createInsurancePool', methods=['POST'])
 def create_insurance_pool():
-    amount = request.form.get('amount')
+    name = request.form.get('name')
+    stakeAmount = request.form.get('stakeAmount')
+    maxClaimeAmount = request.form.get('maxClaimeAmount')
     clsp_path = os.path.join(os.path.dirname(__file__), 'insurance_pool.clsp')
-    cmd = 'cdv clsp curry %s -a %s -a 2000 --treehash' % (clsp_path, amount)
+    cmd = 'cdv clsp curry %s -a %s -a %s --treehash' % (clsp_path, stakeAmount,maxClaimeAmount)
     hash = os.popen(cmd).read().strip()
     cmd = 'cdv encode %s  --prefix txch' % hash
 
     address = os.popen(cmd).read().strip()
     with SqlitDB() as cur:
-        cur.execute("INSERT INTO pool (name,amount,address,hash) VALUES('%s','%s','%s','%s')"
-                    % ('sinso', amount, address, hash))
+        cur.execute("INSERT INTO pool (name,stakeAmount,maxClaimeAmount,address,hash) VALUES('%s','%s','%s','%s','%s')"
+                    % (name, stakeAmount,maxClaimeAmount, address, hash))
     return ResponseModel(data=address).to_json()
 
 
@@ -84,7 +123,7 @@ def create_insurance_pool():
 @app.route('/insurance/pool_info', methods=['GET'])
 def pool_info():
     with SqlitDB() as cur:
-        cur.execute("SELECT id,name,amount,address,hash FROM pool")
+        cur.execute("SELECT * FROM pool")
         data = cur.fetchall()
         desc = cur.description
         result = [dict(zip([col[0] for col in desc], row)) for row in data]

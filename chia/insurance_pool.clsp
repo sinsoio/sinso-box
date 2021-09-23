@@ -1,5 +1,5 @@
 (mod (
-		GINSENG_AMOUNT
+		STAKE_AMOUNT
 		MAX_CLAIMS_AMOUNT
 		pay_puzzle_hash
 		my_puzzle_hash
