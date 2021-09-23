@@ -8,6 +8,7 @@
 		claims
      )
   (defconstant CREATE_COIN 51)
+	(defconstant ASSERT_MY_PUZZLEHASH 72)
 
   ;join the pool,and pay the insurance fee
 	(defun-inline save_change (my_pyzzle_hash save_amount)

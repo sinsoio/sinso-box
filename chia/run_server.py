@@ -6,6 +6,7 @@ from open_db import SqlitDB
 
 app = Flask(__name__)
 
+
 # 创建
 # 返回个人医保地址
 @app.route('/insurance/createUser', methods=['POST'])
@@ -24,23 +25,30 @@ def create_user():
             return ResponseModel(data=address).to_json()
     area_code = request.form.get('area_code', default='')
     email = request.form.get('email', default='')
-
     amount = request.form.get('amount')
     pool_address = request.form.get('poolAddress')
     cmd = 'cdv decode %s' % pool_address
     pool_hash = os.popen(cmd).read().strip()
+    if not pool_hash:
+        return ResponseModel(message='Get pool hash failed', code=201).to_json()
     owner_hash = request.form.get('owner_hash')
     wallet_addr = request.form.get('wallet_addr')
     clsp_path = os.path.join(os.path.dirname(__file__), 'personal_pool.clsp')
-
     cmd = 'cdv clsp curry %s -a %s -a 0x%s -a 0x%s --treehash' % (clsp_path, amount, pool_hash, owner_hash)
     hash = os.popen(cmd).read().strip()
+    if not hash:
+        return ResponseModel(message='Curry failed', code=201).to_json()
     cmd = 'cdv encode %s --prefix txch' % hash
     print(cmd)
     address = os.popen(cmd).read().strip()
+<<<<<<< HEAD
     print(address)
     cmd_puzzle = 'cdv clsp curry %s -a %s -a 0x%s -a 0x%s -x' % (clsp_path, amount, pool_hash, owner_hash)
     puzzle_reveal = os.popen(cmd_puzzle).read().strip()
+=======
+    if not address:
+        return ResponseModel(message='Get address failed', code=201).to_json()
+>>>>>>> 0bc94beaafd9a74b1110c3e3b2c2a27297f62a6a
     with SqlitDB() as cur:
         cur.execute("INSERT INTO user (user_name,country,certify_id,mobile,area_code,email,hash,pool_hash,wallet_addr,puzzle_reveal) VALUES('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')"
                     % (user_name, country, certify_id, mobile, area_code, email, hash, pool_hash, wallet_addr, puzzle_reveal))
@@ -53,14 +61,23 @@ def get_coins():
     address = request.args.get('address')
     cmd = 'cdv decode %s' % address
     hash = os.popen(cmd).read().strip()
+    if not hash:
+        return ResponseModel(message='Decode address failed', code=201).to_json()
     cmd = 'cdv rpc coinrecords --by puzhash %s -s 584873' % hash
     res = os.popen(cmd).read().strip()
+<<<<<<< HEAD
     res = json.loads(res)
     sum = 0
     for i in res:
         if not i['spent']:
             sum += i['coin']['amount']
     return ResponseModel(data=str(sum)).to_json()
+=======
+    if not res:
+        return ResponseModel(message='Get coin info failed', code=201).to_json()
+    print(type(res))
+    return ResponseModel(data=json.loads(res)).to_json()
+>>>>>>> 0bc94beaafd9a74b1110c3e3b2c2a27297f62a6a
 
 
 # 加入医保池
@@ -77,6 +94,7 @@ def join_insurance_pool():
             puzzle_reveal = data[0][0]
     cmd = 'cdv rpc coinrecords --by puzhash %s -s 584873' % hash
     res = os.popen(cmd).read().strip()
+<<<<<<< HEAD
     res = json.loads(res)
     sum = 0
     coin_spends = []
@@ -97,8 +115,16 @@ def join_insurance_pool():
         f.write(json.dumps(join_insurance_pool_data))
     cmd = "cdv rpc pushtx %s " % path
     print(cmd)
+=======
+    if not res:
+        return ResponseModel(message='Join pool failed', code=201).to_json()
+    join_insurance_pool_data = ""
+    cmd = "cdv inspect spendbundles %s -db" % join_insurance_pool
+>>>>>>> 0bc94beaafd9a74b1110c3e3b2c2a27297f62a6a
     res = os.popen(cmd).read().strip()
-    return ResponseModel(data=res).to_json()
+    if not res:
+        return ResponseModel(message='Join pool failed', code=201).to_json()
+    return ResponseModel(data=json.loads(res)).to_json()
 
 
 # 创建医保池
@@ -110,9 +136,13 @@ def create_insurance_pool():
     clsp_path = os.path.join(os.path.dirname(__file__), 'insurance_pool.clsp')
     cmd = 'cdv clsp curry %s -a %s -a %s --treehash' % (clsp_path, stakeAmount,maxClaimeAmount)
     hash = os.popen(cmd).read().strip()
+    if not hash:
+        return ResponseModel(message='Curry failed', code=201).to_json()
     cmd = 'cdv encode %s  --prefix txch' % hash
 
     address = os.popen(cmd).read().strip()
+    if not address:
+        return ResponseModel(message='Encode hash failed', code=201).to_json()
     with SqlitDB() as cur:
         cur.execute("INSERT INTO pool (name,stakeAmount,maxClaimeAmount,address,hash) VALUES('%s','%s','%s','%s','%s')"
                     % (name, stakeAmount,maxClaimeAmount, address, hash))
@@ -120,7 +150,7 @@ def create_insurance_pool():
 
 
 # 获取医保池信息
-@app.route('/insurance/pool_info', methods=['GET'])
+@app.route('/insurance/poolInfo', methods=['GET'])
 def pool_info():
     with SqlitDB() as cur:
         cur.execute("SELECT * FROM pool")
@@ -136,6 +166,8 @@ def claims():
     claims_spend_bundle_data = ""
     cmd = "cdv inspect spendbundles %s -db" % claims_spend_bundle_data
     res = os.popen(cmd).read().strip()
+    if not res:
+        return ResponseModel(message='Claims failed', code=201).to_json()
     return ResponseModel(res).to_json()
 
 
@@ -145,7 +177,8 @@ def convert():
     hash = request.args.get('hash')
     cmd = 'cdv encode %s --prefix txch' % hash
     address = os.popen(cmd).read().strip()
-    print(address)
+    if not address:
+        return ResponseModel(message=hash, code=201).to_json()
     return ResponseModel(data=address).to_json()
 
 
