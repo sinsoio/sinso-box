@@ -110,7 +110,7 @@ def join_insurance_pool():
     print('pushtx----------:',cmd)
     res = os.popen(cmd).read().strip()
     if not res:
-        return ResponseModel(message='Join pool failed', code=201).to_json()
+        return ResponseModel(message='claims failed', code=201).to_json()
     return ResponseModel(data=json.loads(res)).to_json()
 
 
@@ -125,14 +125,18 @@ def create_insurance_pool():
     hash = os.popen(cmd).read().strip()
     if not hash:
         return ResponseModel(message='Curry failed', code=201).to_json()
+
+    cmd = 'cdv clsp curry %s -a %s -a %s -x' % (clsp_path, stakeAmount,maxClaimeAmount)
+    puzzle_reveal = os.popen(cmd).read().strip()
+
     cmd = 'cdv encode %s  --prefix txch' % hash
 
     address = os.popen(cmd).read().strip()
     if not address:
         return ResponseModel(message='Encode hash failed', code=201).to_json()
     with SqlitDB() as cur:
-        cur.execute("INSERT INTO pool (name,stakeAmount,maxClaimeAmount,address,hash) VALUES('%s','%s','%s','%s','%s')"
-                    % (name, stakeAmount,maxClaimeAmount, address, hash))
+        cur.execute("INSERT INTO pool (name,stakeAmount,maxClaimeAmount,address,hash,puzzle_reveal) VALUES('%s','%s','%s','%s','%s','%s')"
+                    % (name, stakeAmount,maxClaimeAmount, address, hash,puzzle_reveal))
     return ResponseModel(data=address).to_json()
 
 
@@ -150,12 +154,51 @@ def pool_info():
 # 报销
 @app.route('/insurance/claims', methods=['POST'])
 def claims():
-    claims_spend_bundle_data = ""
-    cmd = "cdv inspect spendbundles %s -db" % claims_spend_bundle_data
+    wallet_addr = request.form.get('walletAddr')
+    pool_addr = request.form.get('poolAddr')
+    claims_amount = request.form.get('claimsAmount')
+    claims_amount = int(claims_amount)
+    cmd = 'cdv decode %s' % wallet_addr
+    pay_puzzle_hash= os.popen(cmd).read().strip()
+
+    cmd = 'cdv decode %s' % pool_addr
+    my_puzzle_hash= os.popen(cmd).read().strip()
+
+    puzzle_reveal = ''
+    with SqlitDB() as cur:
+        cur.execute("SELECT puzzle_reveal FROM pool WHERE hash='%s'" % my_puzzle_hash)
+        data = cur.fetchall()
+        if len(data[0]) > 0:
+            puzzle_reveal = data[0][0]
+    cmd = 'cdv rpc coinrecords --by puzhash %s -s 584873' % my_puzzle_hash
+    res = os.popen(cmd).read().strip()
+    res = json.loads(res)
+    total_amount = 0
+    coin_spends = []
+    for i in range(0, len(res)):
+        if not res[i]['spent']:
+            total_amount += res[i]['coin']['amount']
+            print('total_amount:',total_amount)
+            parent_coin_info =res[i]['coin']['parent_coin_info'][2:]
+            puzzle_hash = res[i]['coin']['puzzle_hash'][2:]
+            amount = res[i]['coin']['amount']
+            deta = total_amount-claims_amount
+            cmd = 'opc "(0x%s 0x%s %d %d %d)"' % (pay_puzzle_hash,my_puzzle_hash, (total_amount-100) if deta > 0 else 0, 1 if deta > 0 else 0, 1 if deta > 0 else 0)
+            solution = os.popen(cmd).read().strip()
+            coin_info =  {"coin": {"parent_coin_info":parent_coin_info, "puzzle_hash": puzzle_hash, "amount": amount}, "puzzle_reveal": puzzle_reveal, "solution": solution}
+            coin_spends.append(coin_info)
+            if total_amount > claims_amount:
+                break;#如果当前够报销，不再继续打包
+
+    claims_data = {"coin_spends":coin_spends,  "aggregated_signature": "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}
+    path = os.path.join(os.path.dirname(__file__), 'claims.json')
+    with open(path, 'w') as f:
+        f.write(json.dumps(claims_data))
+    cmd = "cdv rpc pushtx %s " % path     
     res = os.popen(cmd).read().strip()
     if not res:
-        return ResponseModel(message='Claims failed', code=201).to_json()
-    return ResponseModel(res).to_json()
+        return ResponseModel(message='claims failed', code=201).to_json()
+    return ResponseModel(data=json.loads(res)).to_json()
 
 
 @app.route('/convertHashToAddress', methods=['GET'])
