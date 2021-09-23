@@ -103,7 +103,7 @@ def join_insurance_pool():
             coin_info =  {"coin": {"parent_coin_info":parent_coin_info, "puzzle_hash": puzzle_hash, "amount": amount}, "puzzle_reveal": puzzle_reveal, "solution": solution}
             coin_spends.append(coin_info)
     join_insurance_pool_data = {"coin_spends":coin_spends,  "aggregated_signature": "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}
-    path = os.path.join(os.path.dirname(__file__), 'tmp.json')
+    path = os.path.join(os.path.dirname(__file__), 'joinInsurancePool.json')
     with open(path, 'w') as f:
         f.write(json.dumps(join_insurance_pool_data))
     cmd = "cdv rpc pushtx %s " % path
@@ -194,7 +194,7 @@ def claims():
     path = os.path.join(os.path.dirname(__file__), 'claims.json')
     with open(path, 'w') as f:
         f.write(json.dumps(claims_data))
-    cmd = "cdv rpc pushtx %s " % path     
+    cmd = "cdv rpc pushtx %s " % path
     res = os.popen(cmd).read().strip()
     if not res:
         return ResponseModel(message='claims failed', code=201).to_json()
