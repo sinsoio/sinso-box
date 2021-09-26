@@ -13,39 +13,35 @@ app = Flask(__name__)
 def create_user():
     user_name = request.form.get('userName', default='')
     country = request.form.get('country', default='')
-    certify_id = request.form.get('certify_id', default='')
+    certify_id = request.form.get('certifyId', default='')
     mobile = request.form.get('mobile', default='')
     with SqlitDB() as cur:
         cur.execute("SELECT hash FROM user WHERE mobile='%s'" % mobile)
-        print('cur.fetchall()',cur.fetchall())
         data = cur.fetchall()
-        if len(data) >0:
-            data=data[0]
+        if len(data) > 0:
+            data = data[0]
         if len(data) > 0:
             hash = data[0]
             cmd = 'cdv encode %s --prefix txch' % hash
             address = os.popen(cmd).read().strip()
             return ResponseModel(data=address).to_json()
-    area_code = request.form.get('area_code', default='')
+    area_code = request.form.get('areaCode', default='')
     email = request.form.get('email', default='')
     amount = request.form.get('amount')
     pool_address = request.form.get('poolAddress')
     cmd = 'cdv decode %s' % pool_address
     pool_hash = os.popen(cmd).read().strip()
-    print('pool_hash',pool_hash)
     if not pool_hash:
         return ResponseModel(message='Get pool hash failed', code=201).to_json()
-    owner_hash = request.form.get('owner_hash')
-    wallet_addr = request.form.get('wallet_addr')
+    owner_hash = request.form.get('ownerHash')
+    wallet_addr = request.form.get('walletAddr')
     clsp_path = os.path.join(os.path.dirname(__file__), 'personal_pool.clsp')
     cmd = 'cdv clsp curry %s -a %s -a 0x%s -a 0x%s --treehash' % (clsp_path, amount, pool_hash, owner_hash)
     hash = os.popen(cmd).read().strip()
     if not hash:
         return ResponseModel(message='Curry failed', code=201).to_json()
     cmd = 'cdv encode %s --prefix txch' % hash
-    print(cmd)
     address = os.popen(cmd).read().strip()
-    print('address:',address)
     cmd = 'cdv clsp curry %s -a %s -a 0x%s -a 0x%s -x' % (clsp_path, amount, pool_hash, owner_hash)
     puzzle_reveal = os.popen(cmd).read().strip()
     if not address:
@@ -94,20 +90,18 @@ def join_insurance_pool():
     for i in range(0, len(res)):
         if not res[i]['spent']:
             sum += res[i]['coin']['amount']
-            parent_coin_info=res[i]['coin']['parent_coin_info'][2:]
-            puzzle_hash=res[i]['coin']['puzzle_hash'][2:]
-            amount=res[i]['coin']['amount']
+            parent_coin_info = res[i]['coin']['parent_coin_info'][2:]
+            puzzle_hash = res[i]['coin']['puzzle_hash'][2:]
+            amount = res[i]['coin']['amount']
             cmd = 'opc "(0x%s %d %d)"' % (hash, (sum-1000) if i == len(res)-1 else 0, 1 if i == len(res)-1 else 0)
-            print('solution' , cmd)
             solution = os.popen(cmd).read().strip()
-            coin_info =  {"coin": {"parent_coin_info":parent_coin_info, "puzzle_hash": puzzle_hash, "amount": amount}, "puzzle_reveal": puzzle_reveal, "solution": solution}
+            coin_info = {"coin": {"parent_coin_info": parent_coin_info, "puzzle_hash": puzzle_hash, "amount": amount}, "puzzle_reveal": puzzle_reveal, "solution": solution}
             coin_spends.append(coin_info)
     join_insurance_pool_data = {"coin_spends":coin_spends,  "aggregated_signature": "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}
     path = os.path.join(os.path.dirname(__file__), 'joinInsurancePool.json')
     with open(path, 'w') as f:
         f.write(json.dumps(join_insurance_pool_data))
     cmd = "cdv rpc pushtx %s " % path
-    print('pushtx----------:',cmd)
     res = os.popen(cmd).read().strip()
     if not res:
         return ResponseModel(message='claims failed', code=201).to_json()
@@ -118,25 +112,22 @@ def join_insurance_pool():
 @app.route('/insurance/createInsurancePool', methods=['POST'])
 def create_insurance_pool():
     name = request.form.get('name')
-    stakeAmount = request.form.get('stakeAmount')
-    maxClaimeAmount = request.form.get('maxClaimeAmount')
+    stake_amount = request.form.get('stakeAmount')
+    max_claime_amount = request.form.get('maxClaimeAmount')
     clsp_path = os.path.join(os.path.dirname(__file__), 'insurance_pool.clsp')
-    cmd = 'cdv clsp curry %s -a %s -a %s --treehash' % (clsp_path, stakeAmount,maxClaimeAmount)
+    cmd = 'cdv clsp curry %s -a %s -a %s --treehash' % (clsp_path, stake_amount, max_claime_amount)
     hash = os.popen(cmd).read().strip()
     if not hash:
         return ResponseModel(message='Curry failed', code=201).to_json()
-
-    cmd = 'cdv clsp curry %s -a %s -a %s -x' % (clsp_path, stakeAmount,maxClaimeAmount)
+    cmd = 'cdv clsp curry %s -a %s -a %s -x' % (clsp_path, stake_amount, max_claime_amount)
     puzzle_reveal = os.popen(cmd).read().strip()
-
     cmd = 'cdv encode %s  --prefix txch' % hash
-
     address = os.popen(cmd).read().strip()
     if not address:
         return ResponseModel(message='Encode hash failed', code=201).to_json()
     with SqlitDB() as cur:
-        cur.execute("INSERT INTO pool (name,stakeAmount,maxClaimeAmount,address,hash,puzzle_reveal) VALUES('%s','%s','%s','%s','%s','%s')"
-                    % (name, stakeAmount,maxClaimeAmount, address, hash,puzzle_reveal))
+        cur.execute("INSERT INTO pool (name,stake_amount,max_claime_amount,address,hash,puzzle_reveal) VALUES('%s','%s','%s','%s','%s','%s')"
+                    % (name, stake_amount, max_claime_amount, address, hash,puzzle_reveal))
     return ResponseModel(data=address).to_json()
 
 
@@ -159,11 +150,9 @@ def claims():
     claims_amount = request.form.get('claimsAmount')
     claims_amount = int(claims_amount)
     cmd = 'cdv decode %s' % wallet_addr
-    pay_puzzle_hash= os.popen(cmd).read().strip()
-
+    pay_puzzle_hash = os.popen(cmd).read().strip()
     cmd = 'cdv decode %s' % pool_addr
-    my_puzzle_hash= os.popen(cmd).read().strip()
-
+    my_puzzle_hash = os.popen(cmd).read().strip()
     puzzle_reveal = ''
     with SqlitDB() as cur:
         cur.execute("SELECT puzzle_reveal FROM pool WHERE hash='%s'" % my_puzzle_hash)
@@ -178,19 +167,18 @@ def claims():
     for i in range(0, len(res)):
         if not res[i]['spent']:
             total_amount += res[i]['coin']['amount']
-            print('total_amount:',total_amount)
-            parent_coin_info =res[i]['coin']['parent_coin_info'][2:]
+            parent_coin_info = res[i]['coin']['parent_coin_info'][2:]
             puzzle_hash = res[i]['coin']['puzzle_hash'][2:]
             amount = res[i]['coin']['amount']
-            deta = total_amount-claims_amount
-            cmd = 'opc "(0x%s 0x%s %d %d %d)"' % (pay_puzzle_hash,my_puzzle_hash, (total_amount-100) if deta > 0 else 0, 1 if deta > 0 else 0, 1 if deta > 0 else 0)
+            data = total_amount-claims_amount
+            cmd = 'opc "(0x%s 0x%s %d %d %d)"' % (pay_puzzle_hash, my_puzzle_hash, (total_amount-100) if data > 0 else 0, 1 if data > 0 else 0, 1 if data > 0 else 0)
             solution = os.popen(cmd).read().strip()
-            coin_info =  {"coin": {"parent_coin_info":parent_coin_info, "puzzle_hash": puzzle_hash, "amount": amount}, "puzzle_reveal": puzzle_reveal, "solution": solution}
+            coin_info = {"coin": {"parent_coin_info": parent_coin_info, "puzzle_hash": puzzle_hash, "amount": amount}, "puzzle_reveal": puzzle_reveal, "solution": solution}
             coin_spends.append(coin_info)
             if total_amount > claims_amount:
-                break;#如果当前够报销，不再继续打包
-
-    claims_data = {"coin_spends":coin_spends,  "aggregated_signature": "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}
+                # 如果当前够报销，不再继续打包
+                break
+    claims_data = {"coin_spends": coin_spends,  "aggregated_signature": "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}
     path = os.path.join(os.path.dirname(__file__), 'claims.json')
     with open(path, 'w') as f:
         f.write(json.dumps(claims_data))
@@ -203,7 +191,6 @@ def claims():
 
 @app.route('/convertHashToAddress', methods=['GET'])
 def convert():
-    # "b5ed7593aab65d28a853347e78398d556f3a4a1913d73e546477cf4466b020c9"
     hash = request.args.get('hash')
     cmd = 'cdv encode %s --prefix txch' % hash
     address = os.popen(cmd).read().strip()
