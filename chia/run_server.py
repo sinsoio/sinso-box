@@ -24,6 +24,8 @@ def create_user():
             hash = data[0]
             cmd = 'cdv encode %s --prefix txch' % hash
             address = os.popen(cmd).read().strip()
+            if not address:
+                return ResponseModel(message='Encode failed', code=201).to_json()
             return ResponseModel(data=address).to_json()
     area_code = request.form.get('areaCode', default='')
     email = request.form.get('email', default='')
@@ -42,10 +44,12 @@ def create_user():
         return ResponseModel(message='Curry failed', code=201).to_json()
     cmd = 'cdv encode %s --prefix txch' % hash
     address = os.popen(cmd).read().strip()
-    cmd = 'cdv clsp curry %s -a %s -a 0x%s -a 0x%s -x' % (clsp_path, amount, pool_hash, owner_hash)
-    puzzle_reveal = os.popen(cmd).read().strip()
     if not address:
         return ResponseModel(message='Get address failed', code=201).to_json()
+    cmd = 'cdv clsp curry %s -a %s -a 0x%s -a 0x%s -x' % (clsp_path, amount, pool_hash, owner_hash)
+    puzzle_reveal = os.popen(cmd).read().strip()
+    if not puzzle_reveal:
+        return ResponseModel(message='Create puzzle reveal failed', code=201).to_json()
     with SqlitDB() as cur:
         cur.execute("INSERT INTO user (user_name,country,certify_id,mobile,area_code,email,hash,pool_hash,wallet_addr,puzzle_reveal) VALUES('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')"
                     % (user_name, country, certify_id, mobile, area_code, email, hash, pool_hash, wallet_addr, puzzle_reveal))
@@ -62,6 +66,8 @@ def get_coins():
         return ResponseModel(message='Decode address failed', code=201).to_json()
     cmd = 'cdv rpc coinrecords --by puzhash %s -s 584873' % hash
     res = os.popen(cmd).read().strip()
+    if not res:
+        return ResponseModel(message='Get coin records failed', code=201).to_json()
     res = json.loads(res)
     sum = 0
     for i in res:
@@ -76,6 +82,8 @@ def join_insurance_pool():
     address = request.form.get('address')
     cmd = 'cdv decode %s' % address
     hash = os.popen(cmd).read().strip()
+    if not hash:
+        return ResponseModel(message='Decode failed', code=201).to_json()
     puzzle_reveal = ''
     with SqlitDB() as cur:
         cur.execute("SELECT puzzle_reveal FROM user WHERE hash='%s'" % hash)
@@ -84,6 +92,8 @@ def join_insurance_pool():
             puzzle_reveal = data[0][0]
     cmd = 'cdv rpc coinrecords --by puzhash %s -s 584873' % hash
     res = os.popen(cmd).read().strip()
+    if not res:
+        return ResponseModel(message='Get coin records failed', code=201).to_json()
     res = json.loads(res)
     sum = 0
     coin_spends = []
@@ -95,9 +105,11 @@ def join_insurance_pool():
             amount = res[i]['coin']['amount']
             cmd = 'opc "(0x%s %d %d)"' % (hash, (sum-1000) if i == len(res)-1 else 0, 1 if i == len(res)-1 else 0)
             solution = os.popen(cmd).read().strip()
+            if not solution:
+                return ResponseModel(message='Create solution failed', code=201).to_json()
             coin_info = {"coin": {"parent_coin_info": parent_coin_info, "puzzle_hash": puzzle_hash, "amount": amount}, "puzzle_reveal": puzzle_reveal, "solution": solution}
             coin_spends.append(coin_info)
-    join_insurance_pool_data = {"coin_spends":coin_spends,  "aggregated_signature": "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}
+    join_insurance_pool_data = {"coin_spends": coin_spends,  "aggregated_signature": "0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}
     path = os.path.join(os.path.dirname(__file__), 'joinInsurancePool.json')
     with open(path, 'w') as f:
         f.write(json.dumps(join_insurance_pool_data))
@@ -121,6 +133,8 @@ def create_insurance_pool():
         return ResponseModel(message='Curry failed', code=201).to_json()
     cmd = 'cdv clsp curry %s -a %s -a %s -x' % (clsp_path, stake_amount, max_claime_amount)
     puzzle_reveal = os.popen(cmd).read().strip()
+    if not puzzle_reveal:
+        return ResponseModel(message='Get puzzle reveal failed', code=201).to_json()
     cmd = 'cdv encode %s  --prefix txch' % hash
     address = os.popen(cmd).read().strip()
     if not address:
@@ -151,8 +165,12 @@ def claims():
     claims_amount = int(claims_amount)
     cmd = 'cdv decode %s' % wallet_addr
     pay_puzzle_hash = os.popen(cmd).read().strip()
+    if not pay_puzzle_hash:
+        return ResponseModel(message='Get puzzle hash failed', code=201).to_json()
     cmd = 'cdv decode %s' % pool_addr
     my_puzzle_hash = os.popen(cmd).read().strip()
+    if not my_puzzle_hash:
+        return ResponseModel(message='Decode failed', code=201).to_json()
     puzzle_reveal = ''
     with SqlitDB() as cur:
         cur.execute("SELECT puzzle_reveal FROM pool WHERE hash='%s'" % my_puzzle_hash)
@@ -161,6 +179,8 @@ def claims():
             puzzle_reveal = data[0][0]
     cmd = 'cdv rpc coinrecords --by puzhash %s -s 584873' % my_puzzle_hash
     res = os.popen(cmd).read().strip()
+    if not res:
+        return ResponseModel(message='Get coin records failed', code=201).to_json()
     res = json.loads(res)
     total_amount = 0
     coin_spends = []
@@ -173,6 +193,8 @@ def claims():
             data = total_amount-claims_amount
             cmd = 'opc "(0x%s 0x%s %d %d %d)"' % (pay_puzzle_hash, my_puzzle_hash, (total_amount-100) if data > 0 else 0, 1 if data > 0 else 0, 1 if data > 0 else 0)
             solution = os.popen(cmd).read().strip()
+            if not solution:
+                return ResponseModel(message='Create solution failed', code=201).to_json()
             coin_info = {"coin": {"parent_coin_info": parent_coin_info, "puzzle_hash": puzzle_hash, "amount": amount}, "puzzle_reveal": puzzle_reveal, "solution": solution}
             coin_spends.append(coin_info)
             if total_amount > claims_amount:
